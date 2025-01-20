@@ -1,5 +1,5 @@
 import { generateCard } from './cardGenerator.js';
-import { showCollection } from './collection.js';
+import { showCollection } from './ui.js';
 import { setupPrintButton } from './print.js';
 
 export function setupEventListeners() {
