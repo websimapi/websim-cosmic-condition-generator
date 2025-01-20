@@ -3,7 +3,7 @@ import { createCollectionViewer } from './ui.js';
 import { getTypeIcon } from './utils.js';
 import { getAllCards } from './db.js';
 
-let cosmicArchive = new WebsimSocket();
+const cosmicArchive = new WebsimSocket();
 
 export function displayFilteredCards(cards, selectedTypes, filterMode, isArchiveView = false) {
   const grid = document.querySelector('.collection-grid');
@@ -18,7 +18,7 @@ export function displayFilteredCards(cards, selectedTypes, filterMode, isArchive
   } else if (filterMode === 'and') {
     filteredCards = cards.filter(card => 
       selectedTypes.every(type => 
-        (card.cosmictype || card.type) 
+        (isArchiveView ? card.cosmictype : card.type)
         .split('/')
         .map(t => t.trim())
         .includes(type)
@@ -27,7 +27,7 @@ export function displayFilteredCards(cards, selectedTypes, filterMode, isArchive
   } else {
     filteredCards = cards.filter(card => 
       selectedTypes.some(type => 
-        (card.cosmictype || card.type) 
+        (isArchiveView ? card.cosmictype : card.type)
         .split('/')
         .map(t => t.trim())
         .includes(type)
@@ -45,19 +45,8 @@ export function displayFilteredCards(cards, selectedTypes, filterMode, isArchive
   }
   
   filteredCards.forEach(card => {
-    if (isArchiveView) {
-      const archiveCardData = {
-        ...card,
-        type: card.cosmictype, 
-        id: card.id,
-        imageUrl: card.backupImageUrl || card.imageUrl
-      };
-      const miniCard = createMiniCard(archiveCardData, isArchiveView);
-      grid.appendChild(miniCard);
-    } else {
-      const miniCard = createMiniCard(card, isArchiveView);
-      grid.appendChild(miniCard);
-    }
+    const miniCard = createMiniCard(card, isArchiveView);
+    grid.appendChild(miniCard);
   });
 }
 

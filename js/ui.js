@@ -372,7 +372,7 @@ export async function handleRegisterToObservatory(archiveData) {
           if (viewer && viewer.querySelector('h2').textContent.includes('Cosmic Archive')) {
             const archiveToggleBtn = viewer.querySelector('.archive-toggle-btn');
             if (archiveToggleBtn) {
-              archiveToggleBtn.click(); // Switch to Cosmic Observatory view
+              archiveToggleBtn.click(); // Switch to Observatory view
               setTimeout(() => archiveToggleBtn.click(), 100); // Switch back to archive view
             }
           }
@@ -391,6 +391,133 @@ export async function handleRegisterToObservatory(archiveData) {
   } catch (error) {
     dialog.remove();
     throw error;
+  }
+}
+
+export async function showCollection() {
+  let viewer = document.querySelector('.collection-viewer');
+  
+  if (!viewer) {
+    viewer = await createCollectionViewer();
+  }
+  
+  const grid = viewer.querySelector('.collection-grid');
+  const tabsContainer = viewer.querySelector('.collection-tabs');
+  
+  if (!grid || !tabsContainer) {
+    console.error('Required collection elements not found');
+    return;
+  }
+
+  try {
+    const isShowingArchive = viewer.querySelector('h2').textContent.includes('Cosmic Archive');
+    let cards;
+    if (isShowingArchive) {
+      cards = await cosmicArchive.collection('cosmic').getList();
+    } else {
+      cards = await getAllCards();
+      cards.sort((a, b) => b.timestamp - a.timestamp);
+    }
+
+    const allTypes = new Set();
+    cards.forEach(card => {
+      const typeString = isShowingArchive ? card.cosmictype : card.type;
+      typeString.split('/').forEach(type => {
+        allTypes.add(type.trim());
+      });
+    });
+    
+    // Update the UI text and icon based on current view
+    const archiveToggleBtn = viewer.querySelector('.archive-toggle-btn');
+    if (archiveToggleBtn) {
+      archiveToggleBtn.title = isShowingArchive ? 'Go to Observatory' : 'Go to Cosmic Archive';
+      const observatoryIcon = archiveToggleBtn.querySelector('.observatory-view-icon');
+      const archiveIcon = archiveToggleBtn.querySelector('.archive-view-icon');
+      if (isShowingArchive) {
+        observatoryIcon.style.display = 'none';
+        archiveIcon.style.display = '';
+      } else {
+        observatoryIcon.style.display = '';
+        archiveIcon.style.display = 'none';
+      }
+    }
+    
+    tabsContainer.innerHTML = `
+      <button class="type-tab" data-type="all">
+        <span>ALL</span>
+      </button>
+      ${Array.from(allTypes).sort().map(type => `
+        <button class="type-tab" data-type="${type}">
+          <div class="type-icon ${type.toLowerCase()}">${getTypeIcon(type)}</div>
+          <span>${type}</span>
+        </button>
+      `).join('')}
+    `;
+
+    let selectedTypes = new Set();
+    let filterMode = 'single'; 
+    
+    const tabs = tabsContainer.querySelectorAll('.type-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', async (e) => {
+        const type = tab.dataset.type;
+        
+        if (e.ctrlKey || e.metaKey) {
+          if (filterMode !== 'and') {
+            selectedTypes.clear(); 
+            filterMode = 'and';
+          }
+          
+          if (selectedTypes.has(type)) {
+            selectedTypes.delete(type);
+          } else if (selectedTypes.size < 2) {
+            selectedTypes.add(type);
+          }
+          
+        } else if (e.shiftKey) {
+          filterMode = 'or';
+          if (selectedTypes.has(type)) {
+            selectedTypes.delete(type);
+          } else {
+            selectedTypes.add(type);
+          }
+          
+        } else {
+          filterMode = 'single';
+          selectedTypes.clear();
+          selectedTypes.add(type);
+        }
+
+        tabs.forEach(t => {
+          t.classList.remove('selected-single', 'selected-or', 'selected-and');
+          if (selectedTypes.has(t.dataset.type)) {
+            t.classList.add(`selected-${filterMode}`);
+          }
+        });
+        
+        const isShowingArchive = viewer.querySelector('h2').textContent.includes('Cosmic Archive');
+        let currentCards;
+        
+        if (isShowingArchive) {
+          currentCards = await cosmicArchive.collection('cosmic').getList();
+        } else {
+          currentCards = await getAllCards();
+          currentCards.sort((a, b) => b.timestamp - a.timestamp);
+        }
+        
+        if (type === 'all' && filterMode === 'single') {
+          selectedTypes.clear();
+        }
+        
+        displayFilteredCards(currentCards, Array.from(selectedTypes), filterMode, isShowingArchive);
+      });
+    });
+    
+    displayFilteredCards(cards, [], 'single', isShowingArchive);
+    
+    viewer.classList.remove('hidden');
+  } catch (error) {
+    console.error('Error loading collection:', error);
   }
 }
 
